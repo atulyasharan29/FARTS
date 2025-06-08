@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FARTS - Flight Awareness and Radar Tracking System</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: white;
+      overflow-y: hidden;
+    }
+
+    #map {
+      height: 100vh;
+      width: 100vw;
+      z-index: 0;
+    }
+
+    .form-container {
+      position: absolute;
+      z-index: 999;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.6);
+      border-radius: 20px;
+      padding: 30px 40px;
+      max-width: 500px;
+      text-align: center;
+      color: white;
+    }
+
+    .input {
+      width: 80%;
+      padding: 10px;
+      font-size: 1em;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+    }
+
+    .submit-btn {
+      background-color: #28a745;
+      color: white;
+      padding: 10px 20px;
+      font-size: 1em;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .plane-icon div {
+      font-size: 28px;
+      color: #ffcc00;
+      transition: transform 0.3s ease;
+      text-shadow: 0 0 3px #000;
+    }
+
+    .plane-icon:hover div {
+      transform: scale(1.2);
+      text-shadow: 0 0 5px #fff;
+    }
+
+    .hover-info-box {
+      position: absolute;
+      background:white ;
+      color: rgba(0, 0, 0, 0.85);
+      padding: 10px;
+      border-radius: 8px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 1000;
+      max-width: 300px;
+    }
+
+    .compact-form {
+      top: 20px !important;
+      right: 20px !important;
+      left: auto !important;
+      transform: none !important;
+      padding: 15px 20px;
+      max-width: 280px;
+      font-size: 0.9em;
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="form-container">
+    <h1>🛫 FARTS</h1>
+    <p>Flight Awareness and Radar Tracking System</p>
+    <form method="POST">
+      {{ form.hidden_tag() }}
+      {{ form.callsign(class="input", placeholder='Enter Callsign', list='cs') }}
+      {{ form.submit(class="submit-btn") }}
+      <datalist id="cs">
+        {% for d in data['states'] %}
+          {% if d[1] and d[1].strip() %}
+            <option value="{{ d[1].strip() }}">{{ d[1].strip() }}</option>
+          {% endif %}
+        {% endfor %}
+      </datalist>
+    </form>
+  </div>
+
+  {% if flight %}
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    const flight = {{ flight | tojson }};
+    const lat = parseFloat(flight.latitude);
+    const lon = parseFloat(flight.longitude);
+
+    const map = L.map('map').setView([lat, lon], 6);
+
+    // Add OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Custom rotating plane icon
+    const planeIcon = L.divIcon({
+      className: 'plane-icon',
+      html: `<div style="transform: rotate(${flight.true_track - 90}deg);">&#9992;</div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15]
+    });
+
+    // Add the rotated plane marker
+    const marker = L.marker([lat, lon], { icon: planeIcon }).addTo(map);
+
+    // Create hover info box
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'hover-info-box';
+    infoDiv.innerHTML = `
+      <strong>Callsign:</strong> ${flight.callsign}<br>
+      <strong>Origin Country:</strong> ${flight.origin_country}<br>
+      <strong>Altitude:</strong> ${Math.round(flight.baro_altitude*3.281)} feet<br>
+      <strong>Velocity:</strong> ${Math.round(flight.velocity*1.944)} kts<br>
+      <strong>Heading:</strong> ${flight.true_track}°<br>
+      <strong>Vertical Rate:</strong> ${Math.round(flight.vertical_rate*3.281)} fps<br>
+      <strong>Squawk:</strong> ${flight.squawk || "N/A"}<br>
+      <strong>Position Source:</strong> ${["ADS-B", "ASTERIX", "MLAT"][flight.position_source] || "Unknown"}
+    `;
+    document.body.appendChild(infoDiv);
+
+    // Show and move the info box on hover
+    marker.on('mouseover', function (e) {
+      infoDiv.style.opacity = '1';
+      const point = map.latLngToContainerPoint(e.latlng);
+      infoDiv.style.left = point.x + 20 + 'px';
+      infoDiv.style.top = point.y + 20 + 'px';
+    });
+
+    marker.on('mousemove', function (e) {
+      const point = map.latLngToContainerPoint(e.latlng);
+      infoDiv.style.left = point.x + 20 + 'px';
+      infoDiv.style.top = point.y + 20 + 'px';
+    });
+
+    marker.on('mouseout', function () {
+      infoDiv.style.opacity = '0';
+    });
+  </script>
+
+  <!-- Auto-refresh every 30 seconds -->
+  <script>
+    setTimeout(() => {
+      location.reload();
+    }, 30000);
+  </script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.querySelector(".form-container");
+      form.classList.add("compact-form");
+    });
+  </script>
+  {% endif %}
+
+</body>
+</html>
