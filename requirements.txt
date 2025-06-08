@@ -17,5 +17,5 @@ flask-wtf
 wtform
 pandas
 datetime
-request
+requests
 flask
