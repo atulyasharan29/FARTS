@@ -1,13 +1,16 @@
 from flask import Flask, redirect, url_for, render_template, request
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
-
+import os
+from dotenv import load_dotenv
 import pandas as pd
 import requests
 from datetime import datetime
 
-client_id = 'atulyasharan29-api-client'
-client_secret = 'vjg5hFd8yiSpsHobsFEqKsvj6IVnKCfj'
+load_dotenv()
+
+client_id = os.getenv('client_id')
+client_secret = os.getenv('client_secret')
 
 def get_access_token(client_id, client_secret):
     url = 'https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token'
